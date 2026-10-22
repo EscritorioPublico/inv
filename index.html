@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mis invitaciones</title>
+<style>
+:root{--bg:#f6f4ff;--card:#fff;--text:#1f1b3a;--accent:#6c4cf1;--muted:#6b6785}
+@media (prefers-color-scheme:dark){:root{--bg:#14122b;--card:#201d3f;--text:#f1efff;--muted:#a9a5c9}}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);padding:24px 16px}
+h1{text-align:center;margin:0 0 4px}
+p.sub{text-align:center;color:var(--muted);margin:0 0 20px}
+#buscar{display:block;width:100%;max-width:480px;margin:0 auto 20px;padding:12px 14px;border-radius:12px;border:1px solid var(--muted);background:var(--card);color:var(--text);font-size:16px}
+#lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;max-width:720px;margin:0 auto}
+a.card{display:block;text-decoration:none;color:var(--text);background:var(--card);border-radius:16px;padding:20px 12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+a.card:active{transform:scale(.97)}
+.emoji{font-size:36px;display:block;margin-bottom:8px}
+.nombre{font-weight:600}
+#vacio{text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+<h1>🎉 Mis invitaciones</h1>
+<p class="sub">Toca una para abrirla</p>
+<input id="buscar" type="search" placeholder="Buscar invitación...">
+<div id="lista"></div>
+<p id="vacio" hidden>No encontré ninguna.</p>
+<script>
+let datos=[];
+const lista=document.getElementById('lista'),vacio=document.getElementById('vacio');
+function pintar(f=''){
+  lista.innerHTML='';
+  const r=datos.filter(d=>d.nombre.toLowerCase().includes(f.toLowerCase()));
+  vacio.hidden=r.length>0;
+  r.forEach(d=>{
+    const a=document.createElement('a');
+    a.className='card';a.href=d.carpeta+'/';
+    a.innerHTML='<span class="emoji">'+(d.emoji||'💌')+'</span><span class="nombre"></span>';
+    a.querySelector('.nombre').textContent=d.nombre;
+    lista.appendChild(a);
+  });
+}
+fetch('invitaciones.json').then(r=>r.json()).then(j=>{datos=j;pintar()}).catch(()=>{vacio.hidden=false;vacio.textContent='No se pudo cargar la lista.'});
+document.getElementById('buscar').addEventListener('input',e=>pintar(e.target.value));
+</script>
+</body>
+</html>
