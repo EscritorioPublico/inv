@@ -289,6 +289,42 @@ Error generating stack: `+e.message+`
 </head>
   <body class="bg-[#fffaf0] text-[#3b2410] antialiased select-none selection:bg-[#ffd88a]">
     <div id="root"></div>
-  </body>
+  <style id="fx-festejo">
+#fx-festejo-capa{position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden}
+.fx-spark{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c);animation:fxSpark .8s ease-out forwards}
+@keyframes fxSpark{to{transform:translate(var(--x),var(--y)) scale(.2);opacity:0}}
+.fx-ring{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border:6px solid #fff;border-radius:50%;box-shadow:0 0 0 4px #9a4a14,0 0 0 8px #2e8b78;animation:fxRing .9s ease-out forwards}
+@keyframes fxRing{to{transform:scale(var(--s,22));opacity:0}}
+.fx-flash{position:fixed;inset:0;background:radial-gradient(circle at var(--fx) var(--fy),#fff 0,#ebdbd0 25%,#9a4a1480 55%,transparent 75%);animation:fxFlash .7s ease-out forwards;pointer-events:none;z-index:9997}
+@keyframes fxFlash{0%{opacity:.95}100%{opacity:0}}
+.ohana-env:not(.is-open){animation:ohanaGlow 2.6s ease-in-out infinite,fxWiggle 3s ease-in-out infinite}
+@keyframes fxWiggle{0%,86%,100%{rotate:0deg}89%{rotate:-3deg}92%{rotate:3deg}95%{rotate:-2deg}98%{rotate:1deg}}
+@media (prefers-reduced-motion:reduce){#fx-festejo-capa,.fx-flash{display:none!important}.ohana-env:not(.is-open){animation:ohanaGlow 2.6s ease-in-out infinite}}
+</style>
+<script id="fx-festejo-js">
+(function(){
+try{
+if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+if(window.__fxFestejo)return;window.__fxFestejo=1;
+var capa=document.createElement('div');capa.id='fx-festejo-capa';document.body.appendChild(capa);
+var COL=['#9a4a14','#2e8b78','#f2a900','#c79b7e','#8cbfb5','#f8d073','#ffffff'];
+function rnd(a,b){return a+Math.random()*(b-a)}
+function pick(a){return a[Math.floor(Math.random()*a.length)]}
+function sparks(x,y,n){for(var i=0;i<n;i++){var s=document.createElement('i');s.className='fx-spark';var a=Math.PI*2*i/n+rnd(-.2,.2),d=rnd(50,120);
+  s.style.left=x+'px';s.style.top=y+'px';s.style.setProperty('--x',Math.cos(a)*d+'px');s.style.setProperty('--y',Math.sin(a)*d+'px');s.style.setProperty('--c',pick(COL));
+  capa.appendChild(s);setTimeout(function(e){e.remove()},900,s)}}
+function ring(x,y,sc){var r=document.createElement('div');r.className='fx-ring';r.style.left=x+'px';r.style.top=y+'px';r.style.setProperty('--s',sc||22);capa.appendChild(r);setTimeout(function(){r.remove()},1000)}
+function flash(x,y){var f=document.createElement('div');f.className='fx-flash';f.style.setProperty('--fx',x+'px');f.style.setProperty('--fy',y+'px');document.body.appendChild(f);setTimeout(function(){f.remove()},800)}
+var first=true,lastT=0;
+document.addEventListener('pointerdown',function(e){
+ var now=Date.now();if(now-lastT<140)return;lastT=now;
+ var x=e.clientX,y=e.clientY;
+ if(first){first=false;flash(x,y);ring(x,y,26);sparks(x,y,18)}
+ else{sparks(x,y,9)}
+},{passive:true,capture:true});
+}catch(err){console.warn('efectos',err)}
+})();
+</script>
+</body>
 </html>
 
