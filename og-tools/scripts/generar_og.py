@@ -390,15 +390,25 @@ def aplicar_tags(s, tags):
 IMG_CLAVE = ('image', 'img', 'poster', 'avatar', 'photo')
 
 
+def es_invitacion(path):
+    """Una invitación Ohana se reconoce por su contenido (objeto S con childName), no por el nombre del archivo:
+    sirve index.html, invitacion.html, inv-*.html... y el index.html del portal (sin ese objeto) se ignora."""
+    try:
+        with open(path, encoding='utf-8', errors='ignore') as f:
+            return 'var S={childName' in f.read()
+    except OSError:
+        return False
+
+
 def descubrir(entrada, recursivo):
     if os.path.isfile(entrada):
         return [entrada]
     if not recursivo:
-        return sorted(glob.glob(os.path.join(entrada, 'inv-*.html')))
+        return sorted(f for f in glob.glob(os.path.join(entrada, '*.html')) if es_invitacion(f))
     out = []
     for raiz, dirs, files in os.walk(entrada):
-        dirs[:] = [x for x in dirs if x not in ('.git', 'node_modules', 'og', '.github')]
-        out += [os.path.join(raiz, f) for f in files if re.fullmatch(r'inv-.+\.html', f)]
+        dirs[:] = [x for x in dirs if x not in ('.git', 'node_modules', 'og', 'og-tools', '.github')]
+        out += [os.path.join(raiz, f) for f in files if f.endswith('.html') and es_invitacion(os.path.join(raiz, f))]
     return sorted(out)
 
 
@@ -614,12 +624,12 @@ async def ejecutar(a, archivos):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('entrada', help='carpeta con inv-*.html o un archivo .html')
+    ap.add_argument('entrada', help='carpeta con las invitaciones (una por subcarpeta) o un archivo .html')
     ap.add_argument('--datos', help='JSON exportado con assets/og_datos.sql (o {slug: config})')
     ap.add_argument('--supabase-url'); ap.add_argument('--key', help='clave anon/publishable (nunca la service_role)')
     ap.add_argument('--auto', action='store_true', help='lee Supabase con la URL/clave que trae cada HTML; si falla la lectura NO toca nada')
     ap.add_argument('--comprobar', action='store_true', help='solo revisa qué cambió (sin navegador y sin escribir nada)')
-    ap.add_argument('--recursivo', action='store_true', help='busca inv-*.html en subcarpetas (implícito con --github)')
+    ap.add_argument('--recursivo', action='store_true', help='busca invitaciones en subcarpetas (implícito con --github)')
     ap.add_argument('--github', action='store_true', help='dentro de GitHub Actions: deduce la URL de GitHub Pages y publica las imágenes junto a los .html')
     ap.add_argument('--raiz-pages', help='carpeta que publica Pages (p. ej. docs). Por defecto se deduce')
     ap.add_argument('--github-output', help='archivo $GITHUB_OUTPUT donde escribir cambios=si|no, lista=, fallos=')
@@ -640,7 +650,7 @@ def main():
             pass
     archivos = descubrir(a.entrada, a.recursivo or a.github)
     if not archivos:
-        sys.exit('✗ no hay archivos inv-*.html en ' + a.entrada)
+        sys.exit('✗ no encontré invitaciones (HTML con "var S={childName") en ' + a.entrada)
     if a.salida_dir:
         os.makedirs(a.salida_dir, exist_ok=True)
     sys.exit(asyncio.run(ejecutar(a, archivos)))
