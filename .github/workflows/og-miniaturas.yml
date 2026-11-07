@@ -1,0 +1,97 @@
+# Miniaturas de WhatsApp para las invitaciones: se actualizan solas.
+# Cada 15 min (y cada vez que subes un inv-*.html) lee Supabase con la conexión que ya trae cada HTML,
+# regenera SOLO las miniaturas de lo que cambió (nombre, edad, fecha u hora), las guarda en og/ junto al HTML
+# y hace commit; GitHub Pages las publica. No necesita ninguna clave ni secreto.
+# Variables opcionales del repositorio (Settings → Secrets and variables → Actions → Variables):
+#   URL_SITIO   si tu sitio NO es https://USUARIO.github.io/REPO  (ej. dominio propio)
+#   RAIZ_PAGES  carpeta que publica Pages si no es la raíz (ej. docs)
+name: Miniaturas de invitaciones (WhatsApp)
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  push:
+    paths:
+      - 'inv-*.html'
+      - '**/inv-*.html'
+  workflow_dispatch:
+    inputs:
+      forzar:
+        description: 'Regenerar TODAS las miniaturas aunque nada haya cambiado'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: og-miniaturas
+  cancel-in-progress: false
+
+jobs:
+  miniaturas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      URL_SITIO: ${{ vars.URL_SITIO }}
+      RAIZ_PAGES: ${{ vars.RAIZ_PAGES }}
+      FORZAR: ${{ inputs.forzar && '--forzar' || '' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Revisar qué cambió (rápido, sin navegador)
+        id: det
+        run: |
+          EXTRA=""
+          [ -n "$URL_SITIO" ] && EXTRA="$EXTRA --url-sitio $URL_SITIO"
+          [ -n "$RAIZ_PAGES" ] && EXTRA="$EXTRA --raiz-pages $RAIZ_PAGES"
+          python og-tools/scripts/generar_og.py . --auto --github --comprobar --github-output "$GITHUB_OUTPUT" $EXTRA $FORZAR
+
+      - name: Instalar navegador
+        if: steps.det.outputs.cambios == 'si'
+        run: |
+          python -m pip install --quiet playwright pillow
+          python -m playwright install --with-deps chromium
+
+      - name: Generar las miniaturas que cambiaron
+        if: steps.det.outputs.cambios == 'si'
+        run: |
+          EXTRA=""
+          [ -n "$URL_SITIO" ] && EXTRA="$EXTRA --url-sitio $URL_SITIO"
+          [ -n "$RAIZ_PAGES" ] && EXTRA="$EXTRA --raiz-pages $RAIZ_PAGES"
+          python og-tools/scripts/generar_og.py . --auto --github $EXTRA $FORZAR
+
+      - name: Guardar los cambios en el repositorio
+        if: steps.det.outputs.cambios == 'si'
+        env:
+          LISTA: ${{ steps.det.outputs.lista }}
+        run: |
+          git config user.name "miniaturas-bot"
+          git config user.email "miniaturas-bot@users.noreply.github.com"
+          git ls-files -m -o --exclude-standard | grep -E '(^|/)inv-[^/]*\.html$|(^|/)og/' | xargs -r -d '\n' git add --
+          if git diff --cached --quiet; then echo "Nada que guardar."; exit 0; fi
+          git commit -m "Miniaturas de WhatsApp actualizadas: $LISTA"
+          ok=0
+          for i in 1 2 3; do
+            if git pull --rebase --autostash origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then ok=1; break; fi
+            sleep 5
+          done
+          if [ "$ok" != 1 ]; then
+            echo "::error::No se pudo subir el commit. Revisa Settings → Actions → General → Workflow permissions: Read and write permissions."
+            exit 1
+          fi
+          gh api -X POST "repos/$GITHUB_REPOSITORY/pages/builds" >/dev/null 2>&1 || true
+
+      - name: Comprobar que las imágenes ya están publicadas
+        if: steps.det.outputs.cambios == 'si'
+        continue-on-error: true
+        env:
+          LISTA: ${{ steps.det.outputs.lista }}
+        run: python og-tools/scripts/verificar_urls_og.py . --slugs "$LISTA" --espera 480
