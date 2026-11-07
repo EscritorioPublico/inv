@@ -1,5 +1,5 @@
 # Miniaturas de WhatsApp para las invitaciones: se actualizan solas.
-# Cada 15 min (y cada vez que subes un inv-*.html) lee Supabase con la conexión que ya trae cada HTML,
+# Cada 15 min (y cada vez que subes o editas el HTML de una invitación) lee Supabase con la conexión que ya trae cada HTML,
 # regenera SOLO las miniaturas de lo que cambió (nombre, edad, fecha u hora), las guarda en og/ junto al HTML
 # y hace commit; GitHub Pages las publica. No necesita ninguna clave ni secreto.
 # Variables opcionales del repositorio (Settings → Secrets and variables → Actions → Variables):
@@ -12,8 +12,8 @@ on:
     - cron: '*/15 * * * *'
   push:
     paths:
-      - 'inv-*.html'
-      - '**/inv-*.html'
+      - '*/*.html'
+      - '!og-tools/**'
   workflow_dispatch:
     inputs:
       forzar:
@@ -75,7 +75,7 @@ jobs:
         run: |
           git config user.name "miniaturas-bot"
           git config user.email "miniaturas-bot@users.noreply.github.com"
-          git ls-files -m -o --exclude-standard | grep -E '(^|/)inv-[^/]*\.html$|(^|/)og/' | xargs -r -d '\n' git add --
+          git ls-files -m -o --exclude-standard | grep -E '^[^/]+/[^/]+\.html$|(^|/)og/' | xargs -r -d '\n' git add --
           if git diff --cached --quiet; then echo "Nada que guardar."; exit 0; fi
           git commit -m "Miniaturas de WhatsApp actualizadas: $LISTA"
           ok=0
